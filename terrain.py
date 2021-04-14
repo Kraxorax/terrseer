@@ -1,18 +1,22 @@
-from PIL import Image, ImageFilter, ImageDraw
+import random
 from numpy import *
+from PIL import Image, ImageFilter, ImageDraw
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 
-im = Image.open( 'hmap.jpg' ).convert("RGBA")
+im = Image.open('scene_to_hmap.jpg' ).convert("RGBA")
 res = Image.new("RGBA", im.size, (255,255,255,0))
 
 artist = ImageDraw.Draw(res)
 
 ## Starting sampling params
 # step to take next measure from
-s_samplingStep = 100
+s_samplingStep = 20
 # how far ahead we want to measure
-s_sightLength = 600
+s_sightLength = 200
 # finess of sampling along the line of sight
-s_sightStep = 30
+s_sightStep = 3
 # step for rotation to look around
 s_sightRotStep = math.pi / 8
 # number of looks to take around
@@ -20,13 +24,13 @@ s_numRotSteps = int((2*math.pi)/s_sightRotStep)
 
 # number of passes to perform
 # each pass applies finer params
-numPasses = 3
+numPasses = 1
 
 # cliffs
-critDiff = 30
+critDiff = 12
 
 # visibility
-ownHeight = 10
+ownHeight = 1
 
 # looks for pi/4 (45deg) rise
 def visibilityCheck(heights, sightStep):
@@ -49,7 +53,8 @@ def seeHeights(heights, sightStep):
     diffCrit = ad > critDiff
     badness = int(ad / critDiff)
     if badness > 0:
-      artist.line([x, y, lx, ly], (255, 0, 0, 255), badness, None)
+      width = int(abs(x-lx)+abs(y-ly))
+      artist.line([x, y, lx, ly], (255, 0, 0, 255), 1, None)
     index += 1
   
 
@@ -64,14 +69,14 @@ def lookStraigth(x,y, a, sightLength, sightStep):
     dy = int(dist * math.cos(a))
     ex = x + dx
     ey = y + dy
-    if (ex >= im.width or ey >= im.height): break
+    if (ex < 0 or ey < 0 or ex >= im.width - 1 or ey >= im.height - 1): break
     pxl = im.getpixel((ex, ey))
     (_r, _g, height, _a) = pxl
     heightPoint = (ex, ey, height)
     heightsAhead.append(heightPoint)
 
   if not heightsAhead == []:
-    visibilityCheck(heightsAhead, sightStep)
+    # visibilityCheck(heightsAhead, sightStep)
     seeHeights(heightsAhead, sightStep)
   
   return heightsAhead
@@ -115,15 +120,86 @@ def multiPass(im, numPasses):
     for stepNum in range(1, numPasses):
       doPass(stepNum)
 
+def isPassablePixel(r, g, b):
+  return b > 0 and not(r > b)
+
+def makePathMatrix(img):
+  matrix = []
+  for y in range(0, img.height - 1):
+    matrix.append([])
+    for x in range(0, img.width - 1):
+      (r, g, b, _a) = img.getpixel((x, y))
+      free = 1 if isPassablePixel(r, g, b) else 0
+      matrix[y].append(free)
+  return matrix 
+
+def pickPoint(img):
+  r, g, b = 0, 0, 0
+  while not isPassablePixel(r, g, b):
+    x = random.randint(0, img.width)
+    y = random.randint(0, img.height)
+    (pr, pg, pb, _a) = img.getpixel((x, y))
+    r, g, b = pr, pg, pb
+  return (x, y)
 
 
-multiPass(im, numPasses)
+
+def drawPath(img, path):
+  draw = ImageDraw.Draw(img)
+  if len(path) < 2: return
+  for i in range(1, len(path) - 1):
+    sx, sy = path[i-1]
+    ex, ey = path[i]
+    draw.line([sx, sy, ex, ey], (0, 255, 0, 255), 1, None)
+  # draw start
+  print(path[0])
+  print(path[len(path)-1])
+  draw.regular_polygon(((path[0]), 3), 3)
+  # draw end
+  draw.regular_polygon(((path[len(path)-1]), 3), 5)
 
 
+def doStuff():
+  multiPass(im, numPasses)
 
-out = Image.alpha_composite(im, res)
+  noGoImg = Image.alpha_composite(im, res)
+  noGoImg.convert('RGB').save("result.png",'PNG')
+  ngi = Image.open('result.png').convert("RGBA")
 
-out.convert('RGB').save("result.jpg",'JPEG' )
-# out.show()
+  startX, startY = pickPoint(ngi)
+  endX, endY = pickPoint(ngi)
 
-print('terrain py --> WIN!')
+  # startX, startY, endX, endY = 212, 237, 203, 167
+
+  matrix = makePathMatrix(noGoImg)
+
+  grid = Grid(matrix=matrix)
+
+  start = grid.node(startX, startY)
+  end = grid.node(endX, endY)
+
+  finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+  path, runs = finder.find_path(start, end, grid)
+
+  print(startX, startY, " -> ", endX, endY)
+  print('operations:', runs, 'path length:', len(path))
+  print(path)
+
+  matrixFile = open('matrixFile.txt', 'w')
+  for row in matrix:
+    for cell in row:
+      matrixFile.write(str(cell))
+    matrixFile.write("\n")
+  matrixFile.close()
+
+  drawPath(ngi, path)
+
+  ngi.convert('RGB').save("found_path.jpg",'PNG')
+
+  # print(grid.grid_str(path=path, start=start, end=end))
+
+  # out.show()
+
+  print('terrain py --> WIN!')
+
+doStuff()
