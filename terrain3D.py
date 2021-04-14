@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 
 # Using an existing stl file:
 # mesh = mesh.Mesh.from_file('100x100 desert.stl')
-scene = pywavefront.Wavefront('test_data/terra_obj/texture.obj')
+scene = pywavefront.Wavefront('test_data/desert/texture.obj')
 
 # print(len(scene.vertices))
 # print(scene.vertices)
