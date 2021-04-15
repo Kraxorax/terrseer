@@ -4,30 +4,36 @@ from PIL import Image, ImageFilter, ImageDraw
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
+from terrain3D import scaleFactor
 
-im = Image.open('scene_to_hmap.jpg' ).convert("RGBA")
+im = Image.open('scene_to_hmap.png' ).convert("RGBA")
 res = Image.new("RGBA", im.size, (255,255,255,0))
 
 artist = ImageDraw.Draw(res)
 
 ## Starting sampling params
-# step to take next measure from
-s_samplingStep = 20
+# meters to take next measure from
+s_samplingStep = 4 * scaleFactor
 # how far ahead we want to measure
-s_sightLength = 200
+s_sightLength = 10 * scaleFactor
 # finess of sampling along the line of sight
-s_sightStep = 3
+s_sightStep = 1 * scaleFactor
 # step for rotation to look around
 s_sightRotStep = math.pi / 8
 # number of looks to take around
 s_numRotSteps = int((2*math.pi)/s_sightRotStep)
+# amx angle 30 degrees
+s_maxAngle = math.pi/6
+
+###
+
 
 # number of passes to perform
 # each pass applies finer params
 numPasses = 1
 
 # cliffs
-critDiff = 12
+critDiff = 6
 
 # visibility
 ownHeight = 1
@@ -54,7 +60,7 @@ def seeHeights(heights, sightStep):
     badness = int(ad / critDiff)
     if badness > 0:
       width = int(abs(x-lx)+abs(y-ly))
-      artist.line([x, y, lx, ly], (255, 0, 0, 255), 1, None)
+      artist.line([x, y, lx, ly], (255, 0, 0, 255), critDiff, None)
     index += 1
   
 
@@ -150,14 +156,22 @@ def drawPath(img, path):
   for i in range(1, len(path) - 1):
     sx, sy = path[i-1]
     ex, ey = path[i]
-    draw.line([sx, sy, ex, ey], (0, 255, 0, 255), 1, None)
+    draw.line([sx, sy, ex, ey], (0, 255, 0, 255), 2, None)
   # draw start
   print(path[0])
   print(path[len(path)-1])
-  draw.regular_polygon(((path[0]), 3), 3)
+  draw.regular_polygon(((path[0]), 3*scaleFactor), 3)
   # draw end
-  draw.regular_polygon(((path[len(path)-1]), 3), 5)
+  draw.regular_polygon(((path[len(path)-1]), 3*scaleFactor), 5)
 
+
+def writeMatrixFile(matrix):
+  matrixFile = open('matrixFile.txt', 'w')
+  for row in matrix:
+    for cell in row:
+      matrixFile.write(str(cell))
+    matrixFile.write("\n")
+  matrixFile.close()
 
 def doStuff():
   multiPass(im, numPasses)
@@ -178,28 +192,22 @@ def doStuff():
   start = grid.node(startX, startY)
   end = grid.node(endX, endY)
 
-  finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
+  finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
   path, runs = finder.find_path(start, end, grid)
 
   print(startX, startY, " -> ", endX, endY)
   print('operations:', runs, 'path length:', len(path))
   print(path)
 
-  matrixFile = open('matrixFile.txt', 'w')
-  for row in matrix:
-    for cell in row:
-      matrixFile.write(str(cell))
-    matrixFile.write("\n")
-  matrixFile.close()
+  writeMatrixFile(matrix)
 
   drawPath(ngi, path)
 
-  ngi.convert('RGB').save("found_path.jpg",'PNG')
+  ngi.convert('RGB').save("found_path.png",'PNG')
 
-  # print(grid.grid_str(path=path, start=start, end=end))
-
-  # out.show()
 
   print('terrain py --> WIN!')
 
-doStuff()
+
+if __name__ == '__main__':
+  doStuff()
