@@ -3,13 +3,13 @@ from numpy import *
 from stl import mesh
 from PIL import Image, ImageDraw
 
-# Using an existing stl file:
-# mesh = mesh.Mesh.from_file('100x100 desert.stl')
+# our 3D scene
 scene = pywavefront.Wavefront('test_data/desert/texture.obj')
 
 # how many pixels in horizontal meter
 scaleFactor = 10
 
+# turns scene into elevatino map
 def sceneToElevationMap(scene):
   minX, minY, minZ = float('inf'), float('inf'), float('inf')
   maxX, maxY, maxZ = float('-inf'), float('-inf'), float('-inf')
@@ -52,6 +52,3 @@ def sceneToElevationMap(scene):
 
 if __name__ == '__main__':
   sceneToElevationMap(scene).convert('RGB').save("scene_to_hmap.png",'PNG')
-
-
-print("WIN!")

@@ -26,7 +26,7 @@ s_numRotSteps = int((2*math.pi)/s_sightRotStep)
 s_maxAngle = math.pi/6
 
 ###
-
+maxColorDiffPerStep = (s_sightStep*0.7)
 
 # number of passes to perform
 # each pass applies finer params
@@ -38,17 +38,6 @@ critDiff = 6
 # visibility
 ownHeight = 1
 
-# looks for pi/4 (45deg) rise
-def visibilityCheck(heights, sightStep):
-  index = 0
-  sx, sy, sh = heights[index]
-  for (x, y, h) in heights:
-    tooHigh = (sh + ownHeight + sightStep * index) - h < 0
-    if tooHigh:
-      artist.line([x, y, sx, sy], (128, 0, 192, 192), int(10/index), None)
-      return
-    index += 1
-
 # reacts to sudden changes in height
 def seeHeights(heights, sightStep):
   index = 0
@@ -56,13 +45,13 @@ def seeHeights(heights, sightStep):
     li = index - 1 if index - 1 > 0 else 0
     (lx, ly, lh) = heights[li]
     ad = abs(h - lh)
-    diffCrit = ad > critDiff
-    badness = int(ad / critDiff)
+    diffCrit = ad > maxColorDiffPerStep
+    badness = int(ad / maxColorDiffPerStep)
     if badness > 0:
       width = int(abs(x-lx)+abs(y-ly))
-      artist.line([x, y, lx, ly], (255, 0, 0, 255), critDiff, None)
+      artist.line([x, y, lx, ly], (255, 0, 0, 255), 5, None)
     index += 1
-  
+
 
 # get array of heights in some direction for sightLenght at sightStep
 # pass the array to some 'comprehension' functions
@@ -126,9 +115,11 @@ def multiPass(im, numPasses):
     for stepNum in range(1, numPasses):
       doPass(stepNum)
 
+# checks colors to decide if pixel can be passed thru
 def isPassablePixel(r, g, b):
   return b > 0 and not(r > b)
 
+# creates a matrix for A*
 def makePathMatrix(img):
   matrix = []
   for y in range(0, img.height - 1):
@@ -139,6 +130,7 @@ def makePathMatrix(img):
       matrix[y].append(free)
   return matrix 
 
+# picks a random passable point from map
 def pickPoint(img):
   r, g, b = 0, 0, 0
   while not isPassablePixel(r, g, b):
@@ -148,8 +140,7 @@ def pickPoint(img):
     r, g, b = pr, pg, pb
   return (x, y)
 
-
-
+# draws path on image
 def drawPath(img, path):
   draw = ImageDraw.Draw(img)
   if len(path) < 2: return
@@ -164,7 +155,7 @@ def drawPath(img, path):
   # draw end
   draw.regular_polygon(((path[len(path)-1]), 3*scaleFactor), 5)
 
-
+# testing helper
 def writeMatrixFile(matrix):
   matrixFile = open('matrixFile.txt', 'w')
   for row in matrix:
@@ -173,7 +164,7 @@ def writeMatrixFile(matrix):
     matrixFile.write("\n")
   matrixFile.close()
 
-def doStuff():
+def main():
   multiPass(im, numPasses)
 
   noGoImg = Image.alpha_composite(im, res)
@@ -199,7 +190,7 @@ def doStuff():
   print('operations:', runs, 'path length:', len(path))
   print(path)
 
-  writeMatrixFile(matrix)
+  # writeMatrixFile(matrix)
 
   drawPath(ngi, path)
 
@@ -210,4 +201,4 @@ def doStuff():
 
 
 if __name__ == '__main__':
-  doStuff()
+  main()
