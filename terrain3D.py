@@ -3,9 +3,11 @@ from numpy import *
 from stl import mesh
 from PIL import Image, ImageDraw
 from timeit import default_timer as timer
-from terrain3D import getGEOData
 
-
+# source .obj
+path_to_obj = 'test_data/desert/texture.obj'
+# result .png
+path_to_result = 'scene_to_hmap.png'
 # how many pixels in horizontal meter
 scaleFactor = 10
 # cutoff angle for passable face
@@ -40,11 +42,10 @@ def sceneToNormalMap(scene):
   Image.MAX_IMAGE_PIXELS = None
   tif = Image.open('test_data\geo_dunes.tif')
 
-  elevationMapImage = Image.new("RGBA", \
-                                #(w*scaleFactor, l*scaleFactor), \
-                                tif.size, \
+  slopeMapImage = Image.new("RGBA", \
+                                (w*scaleFactor, l*scaleFactor), \
                                 (255,0,0,0))
-  artist = ImageDraw.Draw(elevationMapImage)
+  artist = ImageDraw.Draw(slopeMapImage)
 
   for msh in scene.mesh_list:
     print("single mesh ", dir(msh))
@@ -70,10 +71,8 @@ def sceneToNormalMap(scene):
         artist.polygon([pv0, pv1, pv2], fill=(int(500*ang),255,0,255))
 
   print(shape(critSlopes))
-  brushSize = scaleFactor*0.3
-  meterInColor = int(255 / h)
 
-  return elevationMapImage
+  return slopeMapImage
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
@@ -93,9 +92,10 @@ def angle_between(v1, v2):
     v2_u = unit_vector(v2)
     return arccos(clip(dot(v1_u, v2_u), -1.0, 1.0))
 
-
+@deprecate
 def readNormals(m):
   """ Returns copy of the mesh without too steep faces.
+      A remnant of .stl tryouts
   """
   critAng = math.pi/12
   trigs = []
@@ -113,12 +113,6 @@ def readNormals(m):
   end_time = timer()
   print(end_time - start_time, 'found slopes: ', numSlopes)
 
-
-  # noGoImg = Image.new("RGBA", , (255, 0, 0, 1))
-  # drawNGI = ImageDraw.Draw(noGoImg)
-  # for trig in trigs:
-
-
   data = zeros(numSlopes, dtype=mesh.Mesh.dtype)
   slopes = reshape(trigs, (-1, 9))
 
@@ -131,14 +125,8 @@ def readNormals(m):
 
 
 def main():
-  # our 3D scene
-  scene = pywavefront.Wavefront('test_data/desert/texture.obj', collect_faces=True)
+  scene = pywavefront.Wavefront(path_to_obj, collect_faces=True)
   sceneToNormalMap(scene).convert('RGB').save("scene_to_hmap.png",'PNG')
-
-  # m = mesh.Mesh.from_file('test_data/texture.stl')
-  # resultMesh = readNormals(m)
-  # resultMesh.save('test_data/wat.stl')
-  
 
 if __name__ == '__main__':
   print('<- START ->')

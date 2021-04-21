@@ -6,9 +6,6 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from terrain3D import scaleFactor
 
-
-
-
 ## Starting sampling params
 # meters to take next measure from
 s_samplingStep = 4 * scaleFactor
@@ -23,95 +20,11 @@ s_numRotSteps = int((2*math.pi)/s_sightRotStep)
 # amx angle 30 degrees
 s_maxAngle = math.pi/6
 
-###
-maxColorDiffPerStep = (s_sightStep*0.7)
-
-# number of passes to perform
-# each pass applies finer params
-numPasses = 1
-
-# cliffs
-critDiff = 6
-
-# visibility
-ownHeight = 1
-
-# reacts to sudden changes in height
-def seeHeights(heights, sightStep):
-  index = 0
-  for (x, y, h) in heights:
-    li = index - 1 if index - 1 > 0 else 0
-    (lx, ly, lh) = heights[li]
-    ad = abs(h - lh)
-    diffCrit = ad > maxColorDiffPerStep
-    badness = int(ad / maxColorDiffPerStep)
-    if badness > 0:
-      width = int(abs(x-lx)+abs(y-ly))
-      artist.line([x, y, lx, ly], (255, 0, 0, 255), 5, None)
-    index += 1
-
-
-# get array of heights in some direction for sightLenght at sightStep
-# pass the array to some 'comprehension' functions
-# returns array of height in line
-def lookStraigth(x,y, a, sightLength, sightStep):
-  heightsAhead = []
-  for ter in range(1, int(sightLength/sightStep)):
-    dist = ter * sightStep
-    dx = int(dist * math.sin(a))
-    dy = int(dist * math.cos(a))
-    ex = x + dx
-    ey = y + dy
-    if (ex < 0 or ey < 0 or ex >= im.width - 1 or ey >= im.height - 1): break
-    pxl = im.getpixel((ex, ey))
-    (_r, _g, height, _a) = pxl
-    heightPoint = (ex, ey, height)
-    heightsAhead.append(heightPoint)
-
-  if not heightsAhead == []:
-    # visibilityCheck(heightsAhead, sightStep)
-    seeHeights(heightsAhead, sightStep)
-  
-  return heightsAhead
-
-# goes thru all the angles around sampling position and lookStraight/5
-# returns all sights around
-def lookAround(x, y, sightLength, sightRotStep, sightStep):
-  numRotSteps = int((2*math.pi) / sightRotStep)
-  looksAround = []
-  for angleStep in range(1, numRotSteps):
-    angle = angleStep * sightRotStep
-    lookAhead = lookStraigth(x, y, angle, sightLength, sightStep)
-    looksAround.append(lookAhead)
-
-  return looksAround
-
-# goes thru image and selects sampling positions, then lookAround/5
-def sampleImage(im, samplingStep, sightLength, sightRotStep, sightStep):
-  for stepNumHorizontal in range(1, int(im.width/samplingStep)):
-    xPos = samplingStep * stepNumHorizontal
-    if (stepNumHorizontal % 2) == 0:
-      xPos += samplingStep / 2
-
-    for stepNumVertical in range(1, int(im.height/samplingStep)):
-      yPos = samplingStep * stepNumVertical
-      lookAround(xPos, yPos, sightLength, sightRotStep, sightStep)
-
-# given image and number of passes will run sampleImage/5
-# with increasing finesse
-def multiPass(im, numPasses):
-  def doPass(num):
-    ss = s_samplingStep / num
-    sl = s_sightLength / num
-    srs = s_sightRotStep / num
-    sis = s_sightStep / num
-    sampleImage(im, ss, sl, srs, sis)
-
-  if numPasses <= 1:
-    doPass(1)
-  else:
-    for stepNum in range(1, numPasses):
-      doPass(stepNum)
+path_to_slope_map = 'scene_to_hmap.png'
+path_to_tfw = 'test_data\geo_dunes.tfw'
+path_to_tif = 'test_data\geo_dunes.tif'
+path_to_PF_matrix_txt = 'matrixFile.txt'
+path_to_QGIS_point_path = 'qgis\points.py'
 
 # checks colors to decide if pixel can be passed thru
 def isPassablePixel(r, g, b):
@@ -155,7 +68,7 @@ def drawPath(img, path):
 
 # testing helper
 def writeMatrixFile(matrix):
-  matrixFile = open('matrixFile.txt', 'w')
+  matrixFile = open(path_to_PF_matrix_txt, 'w')
   for row in matrix:
     for cell in row:
       matrixFile.write(str(cell))
@@ -192,7 +105,7 @@ def pathToGPArray(path, pw, ph, oLa, oLo):
 
 
 def getGEOData():
-  gdFile = open('test_data\geo_dunes.tfw')
+  gdFile = open(path_to_tfw)
   return gdFile.readlines()
 
 def plotIt(path):
@@ -218,10 +131,18 @@ def plotIt(path):
   # function to show the plot
   plt.show()
 
+def writePointsForQGIS(GPPath):
+  pathGM=open(path_to_QGIS_point_path,'w')
+  pathGM.write('POINTS = [')
+  for lng, lat in GPPath:
+    pathGM.write('('+str(lat)+','+str(lng)+'),')
+  pathGM.write(']')
+  pathGM.close()
+
 def main():
   Image.MAX_IMAGE_PIXELS = None
-  tif = Image.open('test_data\geo_dunes.tif')
-  im = Image.open('scene_to_hmap.png' ).convert("RGBA")
+  tif = Image.open(path_to_tif)
+  im = Image.open(path_to_slope_map).convert("RGBA")
   res = Image.new("RGBA", im.size, (0,0,0,0))
   path = doPF(im)
 
@@ -229,12 +150,8 @@ def main():
   print(pw, _a, _b, ph, oriLat, oriLong)
 
   GPPath = pathToGPArray(path, (tif.width/im.width)*float(pw), (tif.height/im.height)*float(ph), float(oriLat), float(oriLong))
-  pathGM=open('qgis\points.py','w')
-  pathGM.write('POINTS = [')
-  for lng, lat in GPPath:
-    pathGM.write('('+str(lat)+','+str(lng)+'),')
-  pathGM.write(']')
-  pathGM.close()
+
+  writePointsForQGIS(GPPath)
 
   plotIt(GPPath)
 
