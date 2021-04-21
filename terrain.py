@@ -6,10 +6,8 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from terrain3D import scaleFactor
 
-im = Image.open('scene_to_hmap.png' ).convert("RGBA")
-res = Image.new("RGBA", im.size, (255,255,255,0))
 
-artist = ImageDraw.Draw(res)
+
 
 ## Starting sampling params
 # meters to take next measure from
@@ -117,7 +115,7 @@ def multiPass(im, numPasses):
 
 # checks colors to decide if pixel can be passed thru
 def isPassablePixel(r, g, b):
-  return b > 0 and not(r > b)
+  return 0 if r == 255 else r
 
 # creates a matrix for A*
 def makePathMatrix(img):
@@ -147,13 +145,13 @@ def drawPath(img, path):
   for i in range(1, len(path) - 1):
     sx, sy = path[i-1]
     ex, ey = path[i]
-    draw.line([sx, sy, ex, ey], (0, 255, 0, 255), 2, None)
-  # draw start
-  print(path[0])
-  print(path[len(path)-1])
-  draw.regular_polygon(((path[0]), 3*scaleFactor), 3)
-  # draw end
-  draw.regular_polygon(((path[len(path)-1]), 3*scaleFactor), 5)
+    draw.line([sx, sy, ex, ey], (0, 0, 0, 255), int(scaleFactor/3), None)
+  print('start', path[0])
+  print('end', path[len(path)-1])
+  # draw start point
+  draw.regular_polygon(((path[0]), scaleFactor), 3, fill=(0, 0, 0, 255))
+  # draw end point
+  draw.regular_polygon(((path[len(path)-1]), scaleFactor), 5, fill=(0, 0, 0, 255))
 
 # testing helper
 def writeMatrixFile(matrix):
@@ -164,19 +162,13 @@ def writeMatrixFile(matrix):
     matrixFile.write("\n")
   matrixFile.close()
 
-def main():
-  multiPass(im, numPasses)
+def doPF(im):
+  # startX, startY = pickPoint(im)
+  # endX, endY = pickPoint(im)
+  startX, startY, endX, endY = 561, 488, 823, 1123
+  print(startX, startY, " -> ", endX, endY)
 
-  noGoImg = Image.alpha_composite(im, res)
-  noGoImg.convert('RGB').save("result.png",'PNG')
-  ngi = Image.open('result.png').convert("RGBA")
-
-  startX, startY = pickPoint(ngi)
-  endX, endY = pickPoint(ngi)
-
-  # startX, startY, endX, endY = 212, 237, 203, 167
-
-  matrix = makePathMatrix(noGoImg)
+  matrix = makePathMatrix(im)
 
   grid = Grid(matrix=matrix)
 
@@ -186,16 +178,70 @@ def main():
   finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
   path, runs = finder.find_path(start, end, grid)
 
-  print(startX, startY, " -> ", endX, endY)
   print('operations:', runs, 'path length:', len(path))
-  print(path)
+  return path
 
-  # writeMatrixFile(matrix)
+def pathToGPArray(path, pw, ph, oLa, oLo):
+  print('pw, ph, oLa, oLo <-', pw, ph, oLa, oLo)
+  geoPath = []
+  for (xPos, yPos) in path:
+    geoPosX = xPos*pw + oLa
+    geoPosY = yPos*ph + oLo
+    geoPath.append((geoPosX, geoPosY))
+  return geoPath
 
-  drawPath(ngi, path)
 
-  ngi.convert('RGB').save("found_path.png",'PNG')
+def getGEOData():
+  gdFile = open('test_data\geo_dunes.tfw')
+  return gdFile.readlines()
 
+def plotIt(path):
+  # importing the required module
+  import matplotlib.pyplot as plt
+
+  xA = []
+  yA = []
+  for x, y in path:
+    xA.append(x)
+    yA.append(y)
+    
+  # plotting the points 
+  plt.plot(xA, yA)
+    
+  # naming the axis
+  plt.xlabel('x - axis')
+  plt.ylabel('y - axis')
+    
+  # giving a title to my graph
+  plt.title('Some data')
+
+  # function to show the plot
+  plt.show()
+
+def main():
+  Image.MAX_IMAGE_PIXELS = None
+  tif = Image.open('test_data\geo_dunes.tif')
+  im = Image.open('scene_to_hmap.png' ).convert("RGBA")
+  res = Image.new("RGBA", im.size, (0,0,0,0))
+  path = doPF(im)
+
+  [pw, _a, _b, ph, oriLat, oriLong] = getGEOData()
+  print(pw, _a, _b, ph, oriLat, oriLong)
+
+  GPPath = pathToGPArray(path, (tif.width/im.width)*float(pw), (tif.height/im.height)*float(ph), float(oriLat), float(oriLong))
+  pathGM=open('qgis\points.py','w')
+  pathGM.write('POINTS = [')
+  for lng, lat in GPPath:
+    pathGM.write('('+str(lat)+','+str(lng)+'),')
+  pathGM.write(']')
+  pathGM.close()
+
+  plotIt(GPPath)
+
+  drawPath(res, path)
+
+  resultImg = Image.alpha_composite(im, res)
+  resultImg.convert('RGB').save("found_path.png",'PNG')
 
   print('terrain py --> WIN!')
 

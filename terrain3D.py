@@ -3,14 +3,15 @@ from numpy import *
 from stl import mesh
 from PIL import Image, ImageDraw
 from timeit import default_timer as timer
+from terrain3D import getGEOData
 
-print('Started ...')
 
 # how many pixels in horizontal meter
 scaleFactor = 10
+# cutoff angle for passable face
+critAngle = math.pi/12
 
-# turns scene into elevatino map
-def sceneToElevationMap(scene):
+def sceneToNormalMap(scene):
   minX, minY, minZ = float('inf'), float('inf'), float('inf')
   maxX, maxY, maxZ = float('-inf'), float('-inf'), float('-inf')
   print("analyzing ...")
@@ -34,14 +35,23 @@ def sceneToElevationMap(scene):
   print('pixels in meter:', scaleFactor)
 
   critSlopes = []
-  critAngle = radians(60)
   print('Crit angle: ', critAngle)
+
+  Image.MAX_IMAGE_PIXELS = None
+  tif = Image.open('test_data\geo_dunes.tif')
+
+  elevationMapImage = Image.new("RGBA", \
+                                #(w*scaleFactor, l*scaleFactor), \
+                                tif.size, \
+                                (255,0,0,0))
+  artist = ImageDraw.Draw(elevationMapImage)
 
   for msh in scene.mesh_list:
     print("single mesh ", dir(msh))
     for face in msh.faces:
-      v0, v1, v2 = scene.vertices[face[0]], scene.vertices[face[1]], scene.vertices[face[2]]
-      # print('v0, v1, v2', v0, v1, v2)
+      v0, v1, v2 =  scene.vertices[face[0]], \
+                    scene.vertices[face[1]], \
+                    scene.vertices[face[2]]
 
       vx = v0[0] - v1[0]
       vy = v0[1] - v1[1]
@@ -51,31 +61,19 @@ def sceneToElevationMap(scene):
       uz = v0[2] - v2[2]
 
       n = cross((vx, vy, vz), (ux, uy, uz))
-
-      # print('N', n)
       ang = angle_between(unit_vector(n), [0,0,1])
-  
-      # print('ANG', ang)
 
-      if (ang > critAngle):
-        critSlopes.append([v0, v1, v2])
+      if (ang < critAngle):
+        pv1 = ((v1[0]+abs(minX))*scaleFactor, (v1[1]+abs(minY))*scaleFactor)
+        pv0 = ((v0[0]+abs(minX))*scaleFactor, (v0[1]+abs(minY))*scaleFactor)
+        pv2 = ((v2[0]+abs(minX))*scaleFactor, (v2[1]+abs(minY))*scaleFactor)
+        artist.polygon([pv0, pv1, pv2], fill=(int(500*ang),255,0,255))
 
   print(shape(critSlopes))
-  # brushSize = scaleFactor*0.3
-  # meterInColor = int(255 / h)
+  brushSize = scaleFactor*0.3
+  meterInColor = int(255 / h)
 
-  # elevationMapImage = Image.new("RGBA", (w*scaleFactor, l*scaleFactor), (255,0,0,0))
-  # artist = ImageDraw.Draw(elevationMapImage)
-
-  # print("drawing ...")
-  # for x, y, z in scene.vertices:
-  #   height = z + abs(minZ)
-  #   xPos = (x + abs(minX))*scaleFactor
-  #   yPos = (y + abs(minY))*scaleFactor
-  #   color = int(meterInColor * height)
-  #   artist.regular_polygon(((xPos, yPos), 1), 6, 0, (color, color, color, 0))
-
-  # return elevationMapImage
+  return elevationMapImage
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
@@ -97,7 +95,9 @@ def angle_between(v1, v2):
 
 
 def readNormals(m):
-  critAng = radians(15)
+  """ Returns copy of the mesh without too steep faces.
+  """
+  critAng = math.pi/12
   trigs = []
   up = [0,0,1]
 
@@ -105,7 +105,7 @@ def readNormals(m):
   print(start_time, 'finding slopes for', len(m.normals), 'faces')
   for i in range(0, len(m.normals)):
     normal = m.normals[i]
-    ang = angle_between(normal, up)
+    ang = angle_between(up, normal)
     if ang < critAng:
       trigs.append([m.points[i]])
 
@@ -113,40 +113,34 @@ def readNormals(m):
   end_time = timer()
   print(end_time - start_time, 'found slopes: ', numSlopes)
 
+
+  # noGoImg = Image.new("RGBA", , (255, 0, 0, 1))
+  # drawNGI = ImageDraw.Draw(noGoImg)
+  # for trig in trigs:
+
+
   data = zeros(numSlopes, dtype=mesh.Mesh.dtype)
   slopes = reshape(trigs, (-1, 9))
 
-  for j in range(0, numSlopes -1):
-    data['vectors'][j] = [slopes[j][0:3], slopes[j][3:6], slopes[j][6:9]]
+  for i in range(0, numSlopes -1):
+    data['vectors'][i] = [slopes[i][0:3], slopes[i][3:6], slopes[i][6:9]]
 
   newMesh = mesh.Mesh(data.copy())
 
   return newMesh
-  # print(critSlopes)
 
+
+def main():
+  # our 3D scene
+  scene = pywavefront.Wavefront('test_data/desert/texture.obj', collect_faces=True)
+  sceneToNormalMap(scene).convert('RGB').save("scene_to_hmap.png",'PNG')
+
+  # m = mesh.Mesh.from_file('test_data/texture.stl')
+  # resultMesh = readNormals(m)
+  # resultMesh.save('test_data/wat.stl')
+  
 
 if __name__ == '__main__':
-  # our 3D scene
-  # scene = pywavefront.Wavefront('test_data/desert/texture.obj', collect_faces=True)
-  # print(dir(scene))
-
-  m = mesh.Mesh.from_file('test_data/texture.stl')
-  resultMesh = readNormals(m)
-  resultMesh.save('test_data/wat.stl')
-
-  # print(dir(mesh))
-  # print(len(mesh.v0), len(mesh.v1), len(mesh.v2))
-  # print(shape(mesh.points))
-  # print(shape(mesh.normals))
-  # print(mesh.info)
-  # print(shape(mesh.x))
-  # print(shape(mesh.v1))
-  # print(shape(mesh.z))
-
-
-  # sceneToElevationMap(scene) #.convert('RGB').save("scene_to_hmap.png",'PNG')
-  # print(dir(scene))
-  # print(scene.vertices)
-  # print(scene.mesh_list)
-  
+  print('<- START ->')
+  main()
   print('-> DONE <-')
