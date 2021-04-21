@@ -1,4 +1,5 @@
 # terrseer
+Terrain analysis and path finding.
 
 
 ## The problem
