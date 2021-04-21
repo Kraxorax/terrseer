@@ -32,4 +32,4 @@ for (xPos, yPos) in path:
 ```
 
 These GPS coords can be written to a .py file to be read by QGIS software.
-A python scrit in QGIS takes those GPS coords to create new layer and draw polyLine in it.
+A python script in QGIS takes those GPS coords to create new layer and draw polyLine in it.
