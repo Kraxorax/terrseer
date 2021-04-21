@@ -65,9 +65,9 @@ def sceneToNormalMap(scene):
       ang = angle_between(unit_vector(n), [0,0,1])
 
       if (ang < critAngle):
-        pv1 = ((v1[0]+abs(minX))*scaleFactor, (v1[1]+abs(minY))*scaleFactor)
-        pv0 = ((v0[0]+abs(minX))*scaleFactor, (v0[1]+abs(minY))*scaleFactor)
-        pv2 = ((v2[0]+abs(minX))*scaleFactor, (v2[1]+abs(minY))*scaleFactor)
+        pv1 = ((v1[0]+abs(minX))*scaleFactor, (abs(maxY)-v1[1])*scaleFactor)
+        pv0 = ((v0[0]+abs(minX))*scaleFactor, (abs(maxY)-v0[1])*scaleFactor)
+        pv2 = ((v2[0]+abs(minX))*scaleFactor, (abs(maxY)-v2[1])*scaleFactor)
         artist.polygon([pv0, pv1, pv2], fill=(int(500*ang),255,0,255))
 
   print(shape(critSlopes))
@@ -126,7 +126,7 @@ def readNormals(m):
 
 def main():
   scene = pywavefront.Wavefront(path_to_obj, collect_faces=True)
-  sceneToNormalMap(scene).convert('RGB').save("scene_to_hmap.png",'PNG')
+  sceneToNormalMap(scene).convert('RGB').save(path_to_result,'PNG')
 
 if __name__ == '__main__':
   print('<- START ->')
