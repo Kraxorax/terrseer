@@ -1,7 +1,6 @@
 # terrseer
 Terrain analysis and path finding.
 
-
 ## The problem
 Given .obj, .tif and .tfw use A* to find a path of GPS coords that avoids too steep slopes
 
@@ -33,3 +32,8 @@ for (xPos, yPos) in path:
 
 These GPS coords can be written to a .py file to be read by QGIS software.
 A python script in QGIS takes those GPS coords to create new layer and draw polyLine in it.
+
+## Next steps - work in progress 
+1. Pipline: no need for so much files
+2. GPS start and end as parameters
+3. Integration with QGIS
