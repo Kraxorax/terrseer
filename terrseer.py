@@ -10,23 +10,19 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
-# source .obj
+# source paths
 path_to_obj = 'test_data/desert/texture.obj'
-# result .png
-path_to_result = 'scene_to_hmap.png'
-path_to_slope_map = 'scene_to_hmap.png'
-path_to_tfw = 'test_data\geo_dunes.tfw'
-path_to_tif = 'test_data\geo_dunes.tif'
-path_to_PF_matrix_txt = 'matrixFile.txt'
+path_to_tfw = 'test_data/geo_dunes.tfw'
+path_to_tif = 'test_data/geo_dunes.tif'
+# result paths
+path_to_img_result = "test_data/found_path.png"
+path_to_PF_matrix_txt = 'test_data/matrixFile.txt'
 path_to_QGIS_point_path = 'qgis\points.py'
 
-# how many pixels(A* grid cells) in a meter
-scaleFactor = 5
+# how many pixels(A* grid cells) in a meter (1 unit of distance in .obj)
+scaleFactor = 4
 # cutoff angle for passable face
-critAngle = math.pi/16
-
-
-
+critAngle = math.pi/14
 
 
 def sceneToNormalMap(scene):
@@ -53,16 +49,13 @@ def sceneToNormalMap(scene):
   h = int(maxZ - minZ)
 
   print('w, l, h <-', w, l, h)
-  print('pixels in meter:', scaleFactor)
-
-  critSlopes = []
-  print('Crit angle: ', critAngle)
 
   slopeMapImage = Image.new("RGBA", \
                                 (w*scaleFactor, l*scaleFactor), \
                                 (255,0,0,0))
   artist = ImageDraw.Draw(slopeMapImage)
 
+  print('drawing slope map...')
   for msh in scene.mesh_list:
     for face in msh.faces:
       v0, v1, v2 =  scene.vertices[face[0]], \
@@ -83,9 +76,7 @@ def sceneToNormalMap(scene):
         pv1 = ((v1[0]+abs(minX))*scaleFactor, (abs(maxY)-v1[1])*scaleFactor)
         pv0 = ((v0[0]+abs(minX))*scaleFactor, (abs(maxY)-v0[1])*scaleFactor)
         pv2 = ((v2[0]+abs(minX))*scaleFactor, (abs(maxY)-v2[1])*scaleFactor)
-        artist.polygon([pv0, pv1, pv2], fill=(int(500*ang),255,0,255))
-
-  print(shape(critSlopes))
+        artist.polygon([pv0, pv1, pv2], fill=(int(1000*ang),255,0,255))
 
   return slopeMapImage
 
@@ -222,18 +213,17 @@ def writePointsForQGIS(GPPath):
 
 def main():
   scene = pywavefront.Wavefront(path_to_obj, collect_faces=True)
-  slopeMap = sceneToNormalMap(scene) #.convert('RGB').save(path_to_result,'PNG')
+  slopeMap = sceneToNormalMap(scene)
 
   Image.MAX_IMAGE_PIXELS = None
   tif = Image.open(path_to_tif)
-  im = slopeMap# Image.open(path_to_slope_map).convert("RGBA")
-  res = Image.new("RGBA", im.size, (0,0,0,0))
-  path = doPF(im)
+  res = Image.new("RGBA", slopeMap.size, (0,0,0,0))
+  path = doPF(slopeMap)
 
   [pw, _a, _b, ph, oriLat, oriLong] = getGEOData()
   print(pw, _a, _b, ph, oriLat, oriLong)
 
-  GPPath = pathToGPArray(path, (tif.width/im.width)*float(pw), (tif.height/im.height)*float(ph), float(oriLat), float(oriLong))
+  GPPath = pathToGPArray(path, (tif.width/slopeMap.width)*float(pw), (tif.height/slopeMap.height)*float(ph), float(oriLat), float(oriLong))
 
   writePointsForQGIS(GPPath)
 
@@ -241,8 +231,8 @@ def main():
 
   drawPath(res, path)
 
-  resultImg = Image.alpha_composite(im, res)
-  resultImg.convert('RGB').save("found_path.png",'PNG')
+  resultImg = Image.alpha_composite(slopeMap, res)
+  resultImg.convert('RGB').save(path_to_img_result,'PNG')
 
 
 if __name__ == '__main__':
